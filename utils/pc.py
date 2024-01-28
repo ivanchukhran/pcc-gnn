@@ -2,10 +2,11 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 
-def plot_3d_point_cloud(x, y, z, edges=None, show=True, show_axis=True, in_u_sphere=False,
+def plot_3d_point_cloud(point_cloud, edges=None, show=True, show_axis=True, in_u_sphere=False,
                         marker='.', s=8, alpha=.8, figsize=(5, 5), elev=10,
                         azim=240, axis=None, title=None, x1=None, y1=None, z1=None, 
                         backend='qtagg', *args, **kwargs):
+    x, y, z = point_cloud[:, 0], point_cloud[:, 1], point_cloud[:, 2]
     if backend:
         print(f'Switching backend from {plt.get_backend()} to {backend}...')
         plt.switch_backend(backend)
@@ -27,6 +28,12 @@ def plot_3d_point_cloud(x, y, z, edges=None, show=True, show_axis=True, in_u_sph
     ax.view_init(elev=elev, azim=azim)
 
     # TODO: add edges visualization
+    if edges is not None:
+        us, vs = edges
+        for i in range(len(us)):
+            u = us[i]
+            v = vs[i]
+            ax.plot([x[u], x[v]], [y[u], y[v]], [z[u], z[v]], color='r', alpha=0.5)
 
     if in_u_sphere:
         ax.set_xlim3d(-0.5, 0.5)
