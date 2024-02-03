@@ -16,25 +16,19 @@ def plot_3d_point_cloud(point_cloud, edges=None, show=True, show_axis=True, in_u
     else:
         ax = axis
         fig = axis
-
     if title is not None:
         plt.title(title)
-
     if x1 is not None and y1 is not None and z1 is not None:
         ax.scatter(x1, y1, z1, color='r', marker=marker, s=s*3, alpha=1, zorder=2, *args, **kwargs)
         alpha = 0.3
-
     sc = ax.scatter(x, y, z, marker=marker, s=s, alpha=alpha, zorder=1, *args, **kwargs)
     ax.view_init(elev=elev, azim=azim)
-
-    # TODO: add edges visualization
     if edges is not None:
         us, vs = edges
         for i in range(len(us)):
             u = us[i]
             v = vs[i]
             ax.plot([x[u], x[v]], [y[u], y[v]], [z[u], z[v]], color='r', alpha=0.5)
-
     if in_u_sphere:
         ax.set_xlim3d(-0.5, 0.5)
         ax.set_ylim3d(-0.5, 0.5)
@@ -47,14 +41,10 @@ def plot_3d_point_cloud(point_cloud, edges=None, show=True, show_axis=True, in_u
         ax.set_ylim(miv, mav)
         ax.set_zlim(miv, mav)
         plt.tight_layout()
-
     if not show_axis:
         plt.axis('off')
-
     if 'c' in kwargs:
         plt.colorbar(sc)
-
     if show:
         plt.show()
-
     return fig
