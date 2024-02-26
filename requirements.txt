@@ -1,0 +1,5 @@
+matplotlib==3.8.3
+numpy==1.26.4
+plyfile==1.0.3
+torch==2.2.0
+torch_geometric==2.5.0
