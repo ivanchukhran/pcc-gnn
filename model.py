@@ -1,14 +1,20 @@
 import torch
 from torch import nn
 import torch_geometric
-from torch_geometric.nn import GCNConv, global_max_pool, MaxAggregation
+from torch_geometric.nn import EdgeConv
+from torch_geometric.nn import knn_graph
 
 
-def encoder_block(in_channels, out_channels):
+def encoder_block(in_channels: int, out_channels: int) -> nn.Module:
     return nn.Sequential(
-        GCNConv(in_channels, out_channels),
-        nn.ReLU(),
-        MaxAggregation()
+        nn.Linear(2 * in_channels, out_channels), # x2 because of the edge features
+        nn.ReLU()
+    )
+
+def decoder_block(in_channels: int, out_channels: int) -> nn.Module:
+    return nn.Sequential(
+        nn.Linear(in_channels, out_channels),
+        nn.ReLU()
     )
 
 
@@ -18,19 +24,17 @@ class GraphEncoder(nn.Module):
 
     Parameters:
 
-    :param in_channels: int - number of input channels
-    :param hidden_channels: int - number of hidden channels
-    :param out_channels: int - number of output channels (latent dimensionality of the graph encoder)
-    :param num_layers: int - number of layers in the graph encoder from input to output
+    :param k: int - number of nearest neighbors to consider in the graph
     """
-    def __init__(self, latent_dim: int):
-        super(GraphEncoder, self).__init__()
-        self.latent_dim = latent_dim
-        self.conv1 = encoder_block(3, 64)
-        self.conv2 = encoder_block(64, 128)
-        self.conv3 = encoder_block(128, latent_dim)
 
-    def forward(self, x: torch.Tensor, edge_index: torch.Tensor) -> torch.Tensor:
+    def __init__(self, k: int):
+        super(GraphEncoder, self).__init__()
+        self.k = k
+        self.conv0 = EdgeConv(encoder_block(3, 64))
+        self.conv1 = EdgeConv(encoder_block(64, 128))
+        self.conv2 = EdgeConv(encoder_block(128, 256))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass of the graph encoder
 
@@ -38,27 +42,51 @@ class GraphEncoder(nn.Module):
         :param edge_index: torch.tensor - edge index tensor of shape (2, num_edges)
         :return: torch.tensor - output tensor of shape (num_nodes, out_channels)
         """
+        edge_index = knn_graph(x, self.k)
+        x = self.conv0(x, edge_index)
         x = self.conv1(x, edge_index)
         x = self.conv2(x, edge_index)
-        x = self.conv3(x, edge_index)
-        return x
-
-
-class MLP(nn.Module):
-    def __init__(self):
-        super(MLP, self).__init__()
-        pass
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
         return x
 
 
 class Decoder(nn.Module):
-    def __init__(self, latent_dim: int, out_channels: int):
+    def __init__(self):
         super(Decoder, self).__init__()
-        self.latent_dim = latent_dim
-        self.out_channels = out_channels
-        pass
+        self.decoder = nn.Sequential(
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Linear(64, 3)
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.decoder(x)
+
+
+class PCN(nn.Module):
+    def __init__(self, k: int):
+        super(PCN, self).__init__()
+        self.encoder = GraphEncoder(k)
+        self.decoder = Decoder(256)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.encoder(x)
+        x = self.decoder(x)
         return x
+
+
+
+if __name__ == '__main__':
+    encoder = GraphEncoder(k=10)
+    x = torch.rand((100, 3))
+    output = encoder(x)
+    print('\nOutput shape:\n')
+    print(output.shape)
+    print('\n')
+
+    decoder = Decoder()
+    output = decoder(output)
+    print('\nOutput shape:\n')
+    print(output.shape)
+    print('\n')
