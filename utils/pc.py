@@ -48,3 +48,16 @@ def plot_3d_point_cloud(point_cloud, edges=None, show=True, show_axis=True, in_u
     if show:
         plt.show()
     return fig
+
+def plot_multipart_3d_point_cloud(point_clouds: list, colors: list = None, marker = '.', show: bool = True):
+    fig = plt.figure(figsize=(10, 10))
+    ax = fig.add_subplot(111, projection='3d')
+    if colors is None:
+        colors = [None for _ in range(len(point_clouds))]
+        # colors = np.random.rand(len(point_clouds), 3)
+    for i, point_cloud in enumerate(point_clouds):
+        x, y, z = point_cloud[:, 0], point_cloud[:, 1], point_cloud[:, 2]
+        ax.scatter(x, y, z, c=colors[i], marker=marker)
+    if show: 
+        plt.show()
+    return fig
