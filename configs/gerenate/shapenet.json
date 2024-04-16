@@ -1,6 +1,9 @@
 {
     "dataset_path": "/home/chukhran/datasets/completion/shapenet/ShapeNetPointCloud",
-    "categories": ["03001627","02691156", "04379243"],
+    "classes": ["03001627","02691156", "04379243"],
     "num_samples": 4,
-    "min_points": 1024
+    "min_points": 1024,
+    "train": 0.8,
+    "val": 0.1,
+    "test": 0.1
 }

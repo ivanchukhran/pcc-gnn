@@ -8,30 +8,7 @@ import numpy as np
 from dataclasses import dataclass
 
 from utils import load_ply, save_ply
-
-id_to_category = {
-    '02691156': 'airplane', '02773838': 'bag', '02801938': 'basket',
-    '02808440': 'bathtub', '02818832': 'bed', '02828884': 'bench',
-    '02834778': 'bicycle', '02843684': 'birdhouse', '02871439': 'bookshelf',
-    '02876657': 'bottle', '02880940': 'bowl', '02924116': 'bus',
-    '02933112': 'cabinet', '02747177': 'can', '02942699': 'camera',
-    '02954340': 'cap', '02958343': 'car', '03001627': 'chair',
-    '03046257': 'clock', '03207941': 'dishwasher', '03211117': 'monitor',
-    '04379243': 'table', '04401088': 'telephone', '02946921': 'tin_can',
-    '04460130': 'tower', '04468005': 'train', '03085013': 'keyboard',
-    '03261776': 'earphone', '03325088': 'faucet', '03337140': 'file',
-    '03467517': 'guitar', '03513137': 'helmet', '03593526': 'jar',
-    '03624134': 'knife', '03636649': 'lamp', '03642806': 'laptop',
-    '03691459': 'speaker', '03710193': 'mailbox', '03759954': 'microphone',
-    '03761084': 'microwave', '03790512': 'motorcycle', '03797390': 'mug',
-    '03928116': 'piano', '03938244': 'pillow', '03948459': 'pistol',
-    '03991062': 'pot', '04004475': 'printer', '04074963': 'remote_control',
-    '04090263': 'rifle', '04099429': 'rocket', '04225987': 'skateboard',
-    '04256520': 'sofa', '04330267': 'stove', '04530566': 'watercraft',
-    '04554684': 'washer', '02858304': 'boat', '02992529': 'cellphone'
-}
-
-category_to_id = {v: k for k, v in id_to_category.items()}
+from mappings import id_to_category
 
 @dataclass
 class HyperPlane:
@@ -55,6 +32,15 @@ class HyperPlane:
         return np.sign(np.dot(point, self.normal) + self.bias)
 
 def generate_split_sample(points: np.ndarray, min_points: int | None = None) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Generate a split sample from a given point cloud.
+
+    :param points: np.ndarray, point cloud
+    :param min_points: int, minimum number of points to generate
+
+    :return: tuple[np.ndarray, np.ndarray], points above the hyperplane, points below the hyperplane
+    """
+
     while True:
         checkpoint = HyperPlane.random_3d().checkpoint(points) > 0
         points_above = points[~checkpoint]
@@ -79,10 +65,10 @@ def generate_n_samples(filename: str, category: str,  dataset_path: str, num_sam
     filename, format = filename.split('.')
     for _ in range(num_samples):
         existing, missing = generate_split_sample(points, min_points)
-        save_ply(existing, os.path.join(dataset_path, 'slices', 'existing', id_to_category.get(category, ""), f'{filename}_{_}.{format}'))
-        save_ply(missing, os.path.join(dataset_path, 'slices', 'missing', id_to_category.get(category, ""), f'{filename}_{_}.{format}'))
+        save_ply(existing, os.path.join(dataset_path, 'slices', 'existing', category, f'{filename}_{_}.{format}'))
+        save_ply(missing, os.path.join(dataset_path, 'slices', 'missing', category, f'{filename}_{_}.{format}'))
 
-def generate_dataset(dataset_path: str, categories: list | None = None, num_samples: int = 4, min_points: int = 1024):
+def generate_dataset(dataset_path: str, classes: list | None = None, num_samples: int = 4, min_points: int = 1024, *args, **kwargs):
     """
     Generate samples from a dataset.
 
@@ -90,13 +76,15 @@ def generate_dataset(dataset_path: str, categories: list | None = None, num_samp
     :param categories: Optional[list], list of categories to generate samples
     :param num_samples: int, number of samples to generate
     :param min_points: int, minimum number of points to generate
+
+    :return: None
     """
 
     if not os.path.exists(dataset_path):
         raise FileNotFoundError(f"Dataset path {dataset_path} not found")
     category_dirs = os.listdir(dataset_path) # contains the category ids
     for category_dir in category_dirs:
-        if categories and category_dir not in categories:
+        if classes and category_dir not in classes:
             continue
         os.makedirs(os.path.join(dataset_path, 'slices', 'existing', id_to_category.get(category_dir, "")), exist_ok=True)
         os.makedirs(os.path.join(dataset_path, 'slices', 'missing', id_to_category.get(category_dir, "")), exist_ok=True)
@@ -112,6 +100,51 @@ def parse_args():
     parser.add_argument('--cfg', type=str, help='Path to the configuration file', required=True)
     args = parser.parse_args()
     return args
+
+def generate_train_validation_test_split(dataset_path: str, classes: list | None = None, train: float = 0.8, validation: float = 0.1, test: float = 0.1, *args, **kwargs):
+    """
+    Generate a train, validation, test split from a dataset.
+
+    :param dataset_path: str, path to the dataset
+    :param classes: Optional[list], list of classes to generate the split
+    :param train: float, percentage of the dataset to use for training
+    :param validation: float, percentage of the dataset to use for validation
+    :param test: float, percentage of the dataset to use for testing
+
+    :return: None
+    """
+    if not os.path.exists(dataset_path):
+        raise FileNotFoundError(f"Dataset path {dataset_path} not found")
+    category_dirs = os.listdir(dataset_path) # contains the category ids
+
+    os.makedirs(os.path.join(dataset_path, 'slices'), exist_ok=True)
+
+    if not classes:
+        classes = category_dirs
+
+    train_files, validation_files, test_files = [], [], []
+    for category_dir in category_dirs:
+        if category_dir not in classes:
+            continue
+        category_files = os.listdir(os.path.join(dataset_path, category_dir))
+        train_split = int(len(category_files) * train)
+        validation_split = int(len(category_files) * validation)
+        test_split = int(len(category_files) * test)
+        if (train_split + validation_split + test_split) != len(category_files):
+            train_split += len(category_files) - (train_split + validation_split + test_split)
+        np.random.shuffle(category_files)
+        for i, filename in enumerate(category_files):
+            if i < train_split:
+                train_files.append(os.path.join(category_dir, filename))
+            elif i < train_split + validation_split:
+                validation_files.append(os.path.join(category_dir, filename))
+            else:
+                test_files.append(os.path.join(category_dir, filename))
+    splits = {'train': train_files, 'validation': validation_files, 'test': test_files}
+    for split, filelist in splits.items():
+        for filename in filelist:
+            with open(os.path.join(dataset_path, 'slices', f'{split}.list'), 'a') as f:
+                f.write(filename + '\n')
 
 def setup_logger():
     import logging
@@ -140,6 +173,8 @@ def main():
         raise ValueError("Config file is empty")
     logger.info("Generating dataset")
     generate_dataset(**config)
+    logger.info("Generating train, validation, test split")
+    generate_train_validation_test_split(**config)
 
 if __name__ == '__main__':
     main()
