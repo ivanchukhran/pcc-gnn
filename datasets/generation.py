@@ -8,7 +8,6 @@ import numpy as np
 from dataclasses import dataclass
 
 from utils import load_ply, save_ply
-from mappings import id_to_category
 
 @dataclass
 class HyperPlane:
@@ -40,15 +39,14 @@ def generate_split_sample(points: np.ndarray, min_points: int | None = None) -> 
 
     :return: tuple[np.ndarray, np.ndarray], points above the hyperplane, points below the hyperplane
     """
-
     while True:
         checkpoint = HyperPlane.random_3d().checkpoint(points) > 0
         points_above = points[~checkpoint]
         points_below = points[checkpoint]
-        if not min_points:
+        if len(points_above) == min_points:
             return points_above, points_below
-        if (len(points_above) and len(points_below)) >= min_points:
-            return points_above, points_below
+        if len(points_below) == min_points:
+            return points_below, points_above
 
 @ray.remote
 def generate_n_samples(filename: str, category: str,  dataset_path: str, num_samples: int = 4, min_points: int = 1024) -> None:
@@ -83,11 +81,13 @@ def generate_dataset(dataset_path: str, classes: list | None = None, num_samples
     if not os.path.exists(dataset_path):
         raise FileNotFoundError(f"Dataset path {dataset_path} not found")
     category_dirs = os.listdir(dataset_path) # contains the category ids
+    if not classes:
+        classes = category_dirs
     for category_dir in category_dirs:
-        if classes and category_dir not in classes:
+        if category_dir not in classes:
             continue
-        os.makedirs(os.path.join(dataset_path, 'slices', 'existing', id_to_category.get(category_dir, "")), exist_ok=True)
-        os.makedirs(os.path.join(dataset_path, 'slices', 'missing', id_to_category.get(category_dir, "")), exist_ok=True)
+        os.makedirs(os.path.join(dataset_path, 'slices', 'existing', category_dir), exist_ok=True)
+        os.makedirs(os.path.join(dataset_path, 'slices', 'missing', category_dir), exist_ok=True)
     ray.init(num_cpus=os.cpu_count())
     ray.get([generate_n_samples.remote(filename, category_dir, dataset_path, num_samples, min_points)
              for category_dir in category_dirs for filename in os.listdir(os.path.join(dataset_path, category_dir))])
@@ -143,7 +143,7 @@ def generate_train_validation_test_split(dataset_path: str, classes: list | None
     splits = {'train': train_files, 'validation': validation_files, 'test': test_files}
     for split, filelist in splits.items():
         for filename in filelist:
-            with open(os.path.join(dataset_path, 'slices', f'{split}.list'), 'a') as f:
+            with open(os.path.join(dataset_path, 'slices', 'splits', f'{split}.list'), 'a') as f:
                 f.write(filename + '\n')
 
 def setup_logger():
