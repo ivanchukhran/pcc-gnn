@@ -9,6 +9,18 @@ from dataclasses import dataclass
 
 from utils import load_ply, save_ply
 
+def setup_logger():
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    ch = logging.StreamHandler()
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+    return logger
+
+logger = setup_logger()
+
 @dataclass
 class HyperPlane:
     normal: np.ndarray
@@ -58,13 +70,18 @@ def generate_n_samples(filename: str, category: str,  dataset_path: str, num_sam
     :param dataset_path: str, path to the dataset
     :param num_samples: int, number of samples to generate
     """
-    points_path = os.path.join(dataset_path, category, filename)
-    points, _, _ = load_ply(points_path)
-    filename, format = filename.split('.')
-    for _ in range(num_samples):
-        existing, missing = generate_split_sample(points, min_points)
-        save_ply(existing, os.path.join(dataset_path, 'slices', 'existing', category, f'{filename}_{_}.{format}'))
-        save_ply(missing, os.path.join(dataset_path, 'slices', 'missing', category, f'{filename}_{_}.{format}'))
+    try:
+        points_path = os.path.join(dataset_path, category, filename)
+        points, _, _ = load_ply(points_path)
+        filename, format = filename.split('.')
+        logger.info(f"Generating samples for {filename}")
+        for _ in range(num_samples):
+            existing, missing = generate_split_sample(points, min_points)
+            save_ply(existing, os.path.join(dataset_path, 'slices', 'existing', category, f'{filename}_{_}.{format}'))
+            save_ply(missing, os.path.join(dataset_path, 'slices', 'missing', category, f'{filename}_{_}.{format}'))
+    except Exception as e:
+        logger.error(f"Error generating samples for {filename}: {e}")
+        return
 
 def generate_dataset(dataset_path: str, classes: list | None = None, num_samples: int = 4, min_points: int = 1024, *args, **kwargs):
     """
@@ -88,10 +105,14 @@ def generate_dataset(dataset_path: str, classes: list | None = None, num_samples
             continue
         os.makedirs(os.path.join(dataset_path, 'slices', 'existing', category_dir), exist_ok=True)
         os.makedirs(os.path.join(dataset_path, 'slices', 'missing', category_dir), exist_ok=True)
+    logger.info(f"Setting up ray with {os.cpu_count()} CPUs")
     ray.init(num_cpus=os.cpu_count())
+    logger.info("Generating samples")
     ray.get([generate_n_samples.remote(filename, category_dir, dataset_path, num_samples, min_points)
              for category_dir in category_dirs for filename in os.listdir(os.path.join(dataset_path, category_dir))])
+    logger.info("Shutting down ray")
     ray.shutdown()
+    logger.info("Samples generated")
 
 
 def parse_args():
@@ -114,9 +135,11 @@ def generate_train_validation_test_split(dataset_path: str, classes: list | None
     :return: None
     """
     if not os.path.exists(dataset_path):
-        raise FileNotFoundError(f"Dataset path {dataset_path} not found")
+        log_string = f"Dataset path {dataset_path} not found"
+        logger.error(log_string)
+        raise FileNotFoundError(log_string)
     category_dirs = os.listdir(dataset_path) # contains the category ids
-
+    logger.info("Setting up splits directory")
     os.makedirs(os.path.join(dataset_path, 'slices'), exist_ok=True)
 
     if not classes:
@@ -142,24 +165,16 @@ def generate_train_validation_test_split(dataset_path: str, classes: list | None
                 test_files.append(os.path.join(category_dir, filename))
     splits = {'train': train_files, 'validation': validation_files, 'test': test_files}
     for split, filelist in splits.items():
+        logger.info(f"Writing {split} split")
+        os.makedirs(os.path.join(dataset_path, 'slices', 'splits'), exist_ok=True)
         for filename in filelist:
+            logger.info(f"Writing {filename} to {split}.list")
             with open(os.path.join(dataset_path, 'slices', 'splits', f'{split}.list'), 'a') as f:
                 f.write(filename + '\n')
 
-def setup_logger():
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    ch = logging.StreamHandler()
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
-    return logger
 
 def main():
     import json
-
-    logger = setup_logger()
     args = parse_args()
     logger.info(f"Reading config file {args.cfg}")
     if not os.path.exists(args.cfg):
