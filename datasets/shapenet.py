@@ -1,13 +1,12 @@
 import os
 from typing import Callable
 import torch
-from torch import nn
+import sys
 
-from torch_cluster import knn_graph, radius_graph
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from utils import load_ply
-from utils.transformations import random_rotation_matrix
-from .base_dataset import BaseDataset
+from utils import load_ply, random_rotation_matrix
+from datasets.base_dataset import BaseDataset
 
 
 class ShapeNet(BaseDataset):
@@ -17,14 +16,10 @@ class ShapeNet(BaseDataset):
                  classes: list | None = None,
                  use_random_rotation: bool = False,
                  num_samples: int = 4,
-                 transform: Callable | None = None,
-                 edge_linkage: str = 'knn',
-                 edge_criteria: int | float = 9):
+                 transform: Callable | None = None):
         super().__init__(dir_path, split, classes, transform)
         self.use_random_rotation = use_random_rotation
         self.num_samples = num_samples
-        self.edge_linkage = edge_linkage
-        self.edge_criteria = edge_criteria
         if not self.classes:
             self.classes = os.listdir(self.dir_path)
         split_file = os.path.join(self.dir_path, 'slices', 'splits', f"{split}.list")
@@ -44,7 +39,6 @@ class ShapeNet(BaseDataset):
         missing, _, _ = load_ply(missing_filename)
         existing = torch.from_numpy(existing)
         missing = torch.from_numpy(missing)
-        edges = self.edge_linkage(existing, self.edge_criteria)
         if self.use_random_rotation:
             rotation_matrix = random_rotation_matrix()
             existing = torch.matmul(existing, rotation_matrix)
@@ -52,4 +46,10 @@ class ShapeNet(BaseDataset):
         if self.transform is not None:
             existing = self.transform(existing)
             missing = self.transform(missing)
-        return existing, edges, missing
+        return existing, missing
+
+if __name__ == '__main__':
+    dataset = ShapeNet(dir_path='/home/chukhran/datasets/completion/shapenet/ShapeNetPointCloud', split='train')
+    print(len(dataset))
+    existing, missing = dataset[0]
+    print(existing.shape, missing.shape)
