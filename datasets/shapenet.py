@@ -4,7 +4,7 @@ from typing import Callable
 import torch
 from torch_geometric.data import Data, Dataset
 from torch_geometric.loader import DataLoader
-from torch_cluster import knn_graph
+from torch_geometric.nn.pool import knn_graph
 
 from utils import load_ply, random_rotation_matrix
 from .base_dataset import BaseDataset
@@ -87,7 +87,7 @@ class GraphShapeNet(Dataset):
         if self.transform is not None:
             existing = self.transform(existing)
             missing = self.transform(missing)
-        return Data(x=existing, edge_index=knn_graph(existing, k=20), y=missing)
+        return Data(x=existing, edge_index=knn_graph(existing, k=20), y=torch.cat([existing, missing], dim=0))
 
 def run_shape_net():
     dataset = ShapeNet(dir_path='/home/chukhran/datasets/completion/shapenet/ShapeNetPointCloud', split='train')

@@ -4,9 +4,9 @@ from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
 from torch_geometric.nn import global_max_pool
 
-from encoder import GraphEncoder
-from mapping_network import MappingNetwork
-from decoder import Decoder
+from .encoder import GraphEncoder
+from .mapping_network import MappingNetwork
+from .decoder import Decoder
 
 class GraphPointCompletionNetwork(nn.Module):
     def __init__(self, cfg: dict):
@@ -31,8 +31,6 @@ class GraphPointCompletionNetwork(nn.Module):
              .expand(self.grid_size, self.grid_size)
              .reshape(1, -1))
         self.folding_seed = torch.cat([a, b], dim=0).view(1, 2, self.grid_size ** 2)  # (1, 2, S)
-        if torch.cuda.is_available():
-            self.folding_seed = self.folding_seed.cuda()
 
     def forward(self, data: Data) -> tuple[torch.Tensor, torch.Tensor]:
         B = 1 if data.batch is None else int(data.batch.max().item() + 1)
@@ -42,21 +40,18 @@ class GraphPointCompletionNetwork(nn.Module):
         N = data.num_nodes if data.num_nodes is not None else x.shape[0]
         N = N // B  # all point clouds have the same number of points
 
-        feature_global = self.encoder(data.x, data.edge_index, data.batch)                                          # (B, 1024)
-        feature_global = feature_global.unsqueeze(1).expand(B, N, -1)                                               # (B, N, 1024)
+        feature_global = self.encoder(data.x, data.edge_index, data.batch)                                          # (B, num_coarse)
         # Mapping Network
-        coarse = self.mapping_network(feature_global).view(B, -1, 3)                                                # (B, num_coarse * N, 3)
-        point_feat = coarse.unsqueeze(2).expand(B,-1, self.grid_size ** 2, 3)                                       # (B, num_coarse * N, S, 3)
-        point_feat = point_feat.reshape(-1, 3, self.num_dense)                                                      # (B * N, 3, num_dense)
-        seed = self.folding_seed.unsqueeze(2).expand(B * N, -1, self.num_coarse, -1)                                # (B, 2, num_coarse, S)
-        seed = seed.reshape(B * N, -1, self.num_dense)                                                              # (B, 2, num_dense)
-
+        coarse = self.mapping_network(feature_global).view(B, -1, 3)                                                # (B, num_coarse, 3)
+        point_feat = coarse.unsqueeze(2).expand(B,-1, self.grid_size ** 2, 3)                                       # (B, num_coarse, S, 3)
+        point_feat = point_feat.reshape(-1, 3, self.num_dense)                                                      # (B, 3, num_dense)
+        seed = self.folding_seed.unsqueeze(2).expand(B, -1, self.num_coarse, -1)                                    # (B, 2, num_coarse, S)
+        seed = seed.reshape(B, -1, self.num_dense)                                                                  # (B, 2, num_dense)
         feature_global = feature_global.reshape(-1, self.num_coarse).unsqueeze(2).expand(-1, -1, self.num_dense)    # (B * N, num_coarse)
         feat = torch.cat([feature_global, seed, point_feat], dim=1)                                                 # (B, 1024+2+3, num_dense)
-
         # Decoder
         fine = self.decoder(feat) + point_feat
-        return coarse.reshape(B, N, -1, 3).contiguous(), fine.transpose(2, 1).reshape(B, N, -1, 3).contiguous()
+        return coarse.reshape(B, -1, 3).contiguous(), fine.transpose(2, 1).reshape(B,-1, 3).contiguous()
 
 if __name__ == '__main__':
     encoder_blocks = [3, 64, 128, 256, 512, 1024]

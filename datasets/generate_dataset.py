@@ -60,6 +60,43 @@ def generate_split_sample(points: np.ndarray, min_points: int | None = None) -> 
         if len(points_below) == min_points:
             return points_below, points_above
 
+def upsample_points(points: np.ndarray, num_points: int) -> np.ndarray:
+    """
+    Upsample a point cloud to a given number of points.
+
+    :param points: np.ndarray, point cloud
+    :param num_points: int, number of points to upsample to
+
+    :return: np.ndarray, upsampled point cloud
+    """
+    return np.concatenate([points, np.random.rand(num_points - len(points), 3)])
+
+def downsample_points(points: np.ndarray, num_points: int) -> np.ndarray:
+    """
+    Downsample a point cloud to a given number of points.
+
+    :param points: np.ndarray, point cloud
+    :param num_points: int, number of points to downsample to
+
+    :return: np.ndarray, downsampled point cloud
+    """
+    return points[np.random.choice(len(points), num_points, replace=False)]
+
+def sample_points(points: np.ndarray, num_points: int) -> np.ndarray:
+    """
+    Sample a point cloud to a given number of points.
+
+    :param points: np.ndarray, point cloud
+    :param num_points: int, number of points to sample to
+
+    :return: np.ndarray, sampled point cloud
+    """
+    if len(points) < num_points:
+        return upsample_points(points, num_points)
+    if len(points) > num_points:
+        return downsample_points(points, num_points)
+    return points
+
 @ray.remote
 def generate_n_samples(filename: str, category: str,  dataset_path: str, num_samples: int = 4, min_points: int = 1024) -> None:
     """
@@ -73,6 +110,7 @@ def generate_n_samples(filename: str, category: str,  dataset_path: str, num_sam
     try:
         points_path = os.path.join(dataset_path, category, filename)
         points, _, _ = load_ply(points_path)
+        points = sample_points(points, 2048)
         filename, format = filename.split('.')
         logger.info(f"Generating samples for {filename}")
         for _ in range(num_samples):

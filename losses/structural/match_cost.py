@@ -1,5 +1,5 @@
 from torch.autograd import Function
-from losses.structural import StructuralLossesBackend import ApproxMatch, MatchCost, MatchCostGrad
+from .StructuralLossesBackend import ApproxMatch, MatchCost, MatchCostGrad
 
 class MatchCostFunction(Function):
     @staticmethod
