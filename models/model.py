@@ -40,13 +40,14 @@ class GraphPointCompletionNetwork(nn.Module):
         N = data.num_nodes if data.num_nodes is not None else x.shape[0]
         N = N // B  # all point clouds have the same number of points
 
+        device = x.device
         feature_global = self.encoder(data.x, data.edge_index, data.batch)                                          # (B, num_coarse)
         # Mapping Network
         coarse = self.mapping_network(feature_global).view(B, -1, 3)                                                # (B, num_coarse, 3)
         point_feat = coarse.unsqueeze(2).expand(B,-1, self.grid_size ** 2, 3)                                       # (B, num_coarse, S, 3)
         point_feat = point_feat.reshape(-1, 3, self.num_dense)                                                      # (B, 3, num_dense)
         seed = self.folding_seed.unsqueeze(2).expand(B, -1, self.num_coarse, -1)                                    # (B, 2, num_coarse, S)
-        seed = seed.reshape(B, -1, self.num_dense)                                                                  # (B, 2, num_dense)
+        seed = seed.reshape(B, -1, self.num_dense).to(device)                                                       # (B, 2, num_dense)
         feature_global = feature_global.reshape(-1, self.num_coarse).unsqueeze(2).expand(-1, -1, self.num_dense)    # (B * N, num_coarse)
         feat = torch.cat([feature_global, seed, point_feat], dim=1)                                                 # (B, 1024+2+3, num_dense)
         # Decoder
