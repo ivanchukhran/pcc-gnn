@@ -3,7 +3,7 @@ import sys
 import logging
 
 
-def setup_logging(path: str) -> logging.Logger:
+def setup_logging(path: str, logger_name: str | None = None) -> logging.Logger:
     """
     Setup the logging for the application.
 
@@ -25,6 +25,6 @@ def setup_logging(path: str) -> logging.Logger:
     console.setLevel(logging.INFO)
     formatter = logging.Formatter('%(asctime)s: %(levelname)-8s %(message)s')
     console.setFormatter(formatter)
-    logger = logging.getLogger()
+    logger = logging.getLogger(logger_name)
     logger.addHandler(console)
     return logger
