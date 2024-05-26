@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from matplotlib import pyplot as plt
 
@@ -61,3 +62,21 @@ def plot_multipart_3d_point_cloud(point_clouds: list, colors: list = None, marke
     if show: 
         plt.show()
     return fig
+
+def save_plot(point_cloud, epoch, save_path, type_) -> str:
+    """Save a 3D plot of a point cloud.
+
+    Arguments:
+        point_cloud {np.ndarray} -- The point cloud to plot.
+        epoch {int} -- The epoch number.
+        save_path {str} -- The path to save the plot.
+        type_ {str} -- The type of the point cloud. Can be 'existing', 'reconstructed', or 'ground_truth'.
+
+    Returns:
+        str -- The path to the saved plot.
+    """
+    fig = plot_3d_point_cloud(point_cloud, show=False)
+    save_path = os.path.join(save_path, f'{type_}_{epoch}.png')
+    plt.savefig(save_path)
+    plt.close(fig)
+    return save_path
