@@ -50,8 +50,13 @@ class ShapeNet(BaseDataset):
         return existing, missing
 
 class GraphShapeNet(Dataset):
-    def __init__(self, dir_path: str, split: str, classes: list | None = None, use_random_rotation: bool = False,
-                 num_samples: int = 4, transform: Callable | None = None):
+    def __init__(self,
+                 dir_path: str,
+                 split: str,
+                 classes: list | None = None,
+                 use_random_rotation: bool = False,
+                 num_samples: int = 4,
+                 transform: Callable | None = None):
         self.dir_path = dir_path
         self.split = split
         self.classes = classes

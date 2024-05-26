@@ -16,7 +16,7 @@
         "grid_scale": 0.05
     },
     "dataset": {
-        "dir_path": ...,
+        "dir_path": "/home/chukhran/datasets/completion/shapenet/ShapeNetPointCloud",
         "split": "train",
         "classes": ["02691156"],
         "use_random_rotation": true,
