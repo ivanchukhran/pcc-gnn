@@ -1,4 +1,5 @@
 {
     "token": "",
-    "chat_id": ""
+    "chat_id": "",
+    "use_requests_logs": false
 }

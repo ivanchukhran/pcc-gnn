@@ -8,7 +8,7 @@
         },
         "mapping_network": {
             "latent_dim": 512,
-            "num_layers": 2
+            "n_blocks": 2
         },
         "num_coarse": 512,
         "num_dense": 2048,
@@ -37,7 +37,7 @@
     "scheduler": {
 
     },
-    "epochs": 100,
+    "epochs": 2000,
     "save_path": "checkpoints/airplane",
-    "save_interval": 100,
+    "save_interval": 100
 }
