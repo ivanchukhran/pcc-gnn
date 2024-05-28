@@ -15,12 +15,21 @@
         "grid_size": 2,
         "grid_scale": 0.05
     },
-    "dataset": {
-        "dir_path": "/home/chukhran/datasets/completion/shapenet/ShapeNetPointCloud",
-        "split": "train",
-        "classes": ["02691156"],
-        "use_random_rotation": true,
-        "num_samples": 4
+    "dataset":{
+        "train": {
+            "dir_path": "/home/chukhran/datasets/completion/shapenet/ShapeNetPointCloud",
+            "split": "train",
+            "classes": ["02691156"],
+            "use_random_rotation": true,
+            "num_samples": 4
+        },
+        "validation": {
+            "dir_path": "/home/chukhran/datasets/completion/shapenet/ShapeNetPointCloud",
+            "split": "validation",
+            "classes": ["02691156"],
+            "use_random_rotation": false,
+            "num_samples": 4
+        }
     },
     "dataloader": {
         "batch_size": 4,
