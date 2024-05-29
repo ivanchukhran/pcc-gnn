@@ -343,12 +343,13 @@ def main():
         telelogger = TeleLogger(**telelogger_config)
 
     save_samples_path = os.path.join(save_path, 'samples')
-    dirs_to_create = [save_path, save_samples_path]
+    metrics_dir = os.path.join(save_path, 'metrics')
+    dirs_to_create = [save_path, save_samples_path, metrics_dir]
     for dir_ in dirs_to_create:
         os.makedirs(dir_, exist_ok=True)
 
     train(model, dataloaders, optimizer, loss_fn, loss_multiplier, device, epochs,
-          save_path, save_interval, scheduler=scheduler, telelogger=telelogger)
+          save_path, save_interval, scheduler=scheduler, telelogger=telelogger, save_sample_path=save_samples_path, metrics_dir=metrics_dir)
 
 
 if __name__ == '__main__':
