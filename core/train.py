@@ -267,8 +267,6 @@ def train(model: nn.Module,
             np.save(os.path.join(metrics_dir, f'train_losses_{epoch + 1}.npy'), np.array(train_losses))
             np.save(os.path.join(metrics_dir, f'validation_losses_{epoch + 1}.npy'), np.array(validation_losses))
             if telelogger:
-                save_sample_path = os.path.join(save_path, save_sample_path)
-
                 plots_to_send: list[str] = []
                 plots_to_send.append(save_plot(existing[0].numpy(), epoch=epoch, save_path=save_sample_path, type_='existing'))
                 plots_to_send.append(save_plot(reconstructed[1].numpy(), epoch=epoch, save_path=save_sample_path, type_='reconstructed'))
