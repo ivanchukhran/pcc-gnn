@@ -7,10 +7,12 @@ from typing import Dict, Callable
 import torch
 from torch import nn
 from torch.optim import Optimizer
+from torch.optim.lr_scheduler import LRScheduler
 from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
 
 from tqdm import tqdm
+import numpy as np
 
 from models import GraphPointCompletionNetwork
 from datasets import GraphShapeNet
@@ -117,7 +119,7 @@ def validation_step(model: nn.Module,
 restore_policies = ['latest', 'best_loss']
 log_regex = re.compile(r'Epoch: (\d+), Train Loss: (\d+\.\d+), Validation Loss: (\d+\.\d+)(, new best loss)?')
 
-def restore_metrics(policy: str, weight_dir: str | None = None, logs_dir: str | None = None) -> tuple:
+def get_last_metrics_by_policy(policy: str, weight_dir: str | None = None, logs_dir: str | None = None) -> tuple:
     """
     Restore the best loss and epoch from the previous training.
 
@@ -171,11 +173,30 @@ def restore_metrics(policy: str, weight_dir: str | None = None, logs_dir: str | 
                 best_loss = float('inf')
     return best_loss, best_epoch
 
-def restore_model_state(epoch: int, model: nn.Module, optimizer: Optimizer, save_path: str) -> None:
+def restore_metrics(metrics_dir: str, epoch: int) -> tuple:
+    """
+    Restore the training and validation losses from the previous training.
+
+    Arguments:
+        metrics_dir: str - The path to the metrics directory.
+        epoch: int - The epoch to restore the metrics from.
+
+    Returns:
+        train_losses: list[float] - The training losses.
+        validation_losses: list[float] - The validation losses.
+    """
+    train_losses = np.load(os.path.join(metrics_dir, f'train_losses_{epoch}.npy'))
+    validation_losses = np.load(os.path.join(metrics_dir, f'validation_losses_{epoch}.npy'))
+    return train_losses.tolist(), validation_losses.tolist()
+
+def restore_model_state(save_path: str, epoch: int, model: nn.Module, optimizer: Optimizer, scheduler: LRScheduler | None = None) -> None:
     weight_path = os.path.join(save_path, f'model_{epoch}.pt')
     state_dict = torch.load(weight_path)
     model.load_state_dict(state_dict['model'])
     optimizer.load_state_dict(state_dict['optimizer'])
+    if scheduler:
+        scheduler.load_state_dict(state_dict['scheduler'])
+
 
 def train(model: nn.Module,
           dataloaders: dict[str, DataLoader],
@@ -188,7 +209,8 @@ def train(model: nn.Module,
           save_interval: int = 1,
           scheduler: torch.optim.lr_scheduler.LRScheduler | None = None,
           telelogger: TeleLogger | None = None,
-          save_sample_path: str = 'samples') -> None:
+          save_sample_path: str = 'samples',
+          metrics_dir: str = 'metrics') -> None:
     """
     Train the model for multiple epochs.
 
@@ -203,10 +225,14 @@ def train(model: nn.Module,
         save_path: str - The path to save the model to.
         save_interval: int - The interval at which to save the model.
     """
-    best_loss, best_epoch = restore_metrics(policy='latest', weight_dir=save_path, logs_dir=logs_dir)
+    best_loss, best_epoch = get_last_metrics_by_policy(policy='latest', weight_dir=save_path, logs_dir=logs_dir)
     logger.info(f'Restored best loss: {best_loss}, best epoch: {best_epoch}')
 
+    train_losses = []
+    validation_losses = []
+
     if best_epoch > 0:
+        train_losses, validation_losses = restore_metrics(metrics_dir=metrics_dir, epoch=best_epoch)
         restore_model_state(epoch=best_epoch, model=model, optimizer=optimizer, save_path=save_path)
 
     train_dataloader = dataloaders['train']
@@ -227,13 +253,19 @@ def train(model: nn.Module,
 
         logger.info(log_message)
 
+        train_losses.append(loss)
+        validation_losses.append(validation_loss)
+
         if (epoch + 1) % save_interval == 0 :
             state_dict = {
                 'model': model.state_dict(),
-                'optimizer': optimizer.state_dict()
+                'optimizer': optimizer.state_dict(),
+                'scheduler': scheduler.state_dict() if scheduler else None
             }
             full_save_path = os.path.join(save_path, f'model_{epoch + 1}.pt')
             torch.save(state_dict, full_save_path)
+            np.save(os.path.join(metrics_dir, f'train_losses_{epoch + 1}.npy'), np.array(train_losses))
+            np.save(os.path.join(metrics_dir, f'validation_losses_{epoch + 1}.npy'), np.array(validation_losses))
             if telelogger:
                 save_sample_path = os.path.join(save_path, save_sample_path)
 
@@ -277,7 +309,8 @@ def main():
     scheduler = None
     scheduler_config = config.get('scheduler')
     if scheduler_config:
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, **scheduler_config)
+        scheduler = getattr(torch.optim.lr_scheduler, scheduler_config.get('type', 'StepLR'))
+        scheduler = scheduler(optimizer, **scheduler_config.get('hyperparameters', {}))
     loss_fn = ChamferDistance()
     loss_multiplier = config.get('loss_multiplier', 1.0)
 
