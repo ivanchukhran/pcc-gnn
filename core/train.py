@@ -117,7 +117,7 @@ def validation_step(model: nn.Module,
                         ground_truth.detach().cpu())
 
 restore_policies = ['latest', 'best_loss']
-log_regex = re.compile(r'Epoch: (\d+), Train Loss: (\d+\.\d+), Validation Loss: (\d+\.\d+)(, new best loss)?')
+log_regex = re.compile(r'.+Epoch: (\d+), Train Loss: (\d+\.\d+), Validation Loss: (\d+\.\d+)(, new best loss)?')
 
 def get_last_metrics_by_policy(policy: str, weight_dir: str | None = None, logs_dir: str | None = None) -> tuple:
     """
@@ -210,7 +210,8 @@ def train(model: nn.Module,
           scheduler: torch.optim.lr_scheduler.LRScheduler | None = None,
           telelogger: TeleLogger | None = None,
           save_sample_path: str = 'samples',
-          metrics_dir: str = 'metrics') -> None:
+          metrics_dir: str = 'metrics',
+          logs_dir: str = 'logs/telelogger') -> None:
     """
     Train the model for multiple epochs.
 
@@ -243,7 +244,7 @@ def train(model: nn.Module,
         if scheduler:
             scheduler.step()
         validation_loss, validation_samples = validation_step(model, validation_dataloader, loss_fn, device, loss_multiplier)
-
+        validation_existing, validation_reconstructed, validation_ground_truth = validation_samples
         log_message = f'Epoch: {epoch + 1}, Train Loss: {loss:.4}, Validation Loss: {validation_loss:.4f}'
 
         if validation_loss < best_loss:
@@ -273,9 +274,9 @@ def train(model: nn.Module,
                 plots_to_send.append(save_plot(ground_truth[2].numpy(), epoch=epoch, save_path=save_sample_path, type_='ground_truth'))
 
                 validiation_plots_to_send: list[str] = []
-                validiation_plots_to_send.append(save_plot(validation_samples[0].numpy(), epoch=epoch, save_path=save_sample_path, type_='val_existing'))
-                validiation_plots_to_send.append(save_plot(validation_samples[1].numpy(), epoch=epoch, save_path=save_sample_path, type_='val_reconstructed'))
-                validiation_plots_to_send.append(save_plot(validation_samples[2].numpy(), epoch=epoch, save_path=save_sample_path, type_='val_ground_truth'))
+                validiation_plots_to_send.append(save_plot(validation_existing[0].numpy(), epoch=epoch, save_path=save_sample_path, type_='val_existing'))
+                validiation_plots_to_send.append(save_plot(validation_reconstructed[1].numpy(), epoch=epoch, save_path=save_sample_path, type_='val_reconstructed'))
+                validiation_plots_to_send.append(save_plot(validation_ground_truth[2].numpy(), epoch=epoch, save_path=save_sample_path, type_='val_ground_truth'))
                 plots_to_send.extend(validiation_plots_to_send)
                 telelogger.send_message_with_media(media=plots_to_send, message=log_message) # Send only the first 9 plots because of Telegram's limit
 
@@ -342,12 +343,14 @@ def main():
 
     save_samples_path = os.path.join(save_path, 'samples')
     metrics_dir = os.path.join(save_path, 'metrics')
-    dirs_to_create = [save_path, save_samples_path, metrics_dir]
+    logs_dir = 'logs'
+    dirs_to_create = [save_path, save_samples_path, metrics_dir, logs_dir]
     for dir_ in dirs_to_create:
         os.makedirs(dir_, exist_ok=True)
 
     train(model, dataloaders, optimizer, loss_fn, loss_multiplier, device, epochs,
-          save_path, save_interval, scheduler=scheduler, telelogger=telelogger, save_sample_path=save_samples_path, metrics_dir=metrics_dir)
+          save_path, save_interval, scheduler=scheduler, telelogger=telelogger, save_sample_path=save_samples_path, metrics_dir=metrics_dir,
+          logs_dir=os.path.join(logs_dir, 'telelogger'))
 
 
 if __name__ == '__main__':

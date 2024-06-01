@@ -1,18 +1,17 @@
 {
     "model": {
         "encoder": {
-            "blocks": [3, 64, 128, 256, 512]
+            "blocks": [3, 64, 128, 256, 512, 1024]
         },
         "decoder": {
-            "blocks": [517, 256, 128, 64, 3]
+            "blocks": [1029, 512, 256, 128, 64, 3]
         },
         "mapping_network": {
-            "latent_dim": 512,
+            "latent_dim": 1024,
             "n_blocks": 2
         },
-        "num_coarse": 512,
         "num_dense": 2048,
-        "grid_size": 2,
+        "grid_size": 4,
         "grid_scale": 0.05
     },
     "dataset":{
@@ -46,11 +45,11 @@
     "scheduler": {
         "type": "StepLR",
         "hyperparameters": {
-            "step_size": 1000,
-            "gamma": 0.5
+            "step_size": 50,
+            "gamma": 0.85
         }
     },
-    "epochs": 2000,
+    "epochs": 300,
     "save_path": "checkpoints/airplane",
-    "save_interval": 50
+    "save_interval": 20
 }

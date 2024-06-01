@@ -15,12 +15,14 @@ class GraphPointCompletionNetwork(nn.Module):
             raise ValueError("The configuration dictionary should not be empty.")
         if not (cfg.get('encoder') and cfg.get('mapping_network') and cfg.get('decoder')):
             raise ValueError("The configuration dictionary should contain encoder, mapping_network and decoder.")
-        self.num_coarse: int = cfg.get('num_coarse', 1024)
         self.num_dense: int = cfg.get('num_dense', 16384)
-        self.encoder = GraphEncoder(**cfg['encoder'])
-        self.mapping_network = MappingNetwork(**cfg['mapping_network'], num_coarse=self.num_coarse)
         self.grid_size: int = cfg.get('grid_size', 4)
         self.grid_scale: int = cfg.get('grid_scale', 0.05)
+        assert self.num_dense % (self.grid_size ** 2) == 0, "num_dense should be divisible by grid_size ** 2"
+        self.num_coarse = self.num_dense // (self.grid_size ** 2)
+
+        self.encoder = GraphEncoder(**cfg['encoder'])
+        self.mapping_network = MappingNetwork(**cfg['mapping_network'], num_coarse=self.num_coarse)
         self.decoder = Decoder(**cfg['decoder'], grid_size=self.grid_size, grid_scale=self.grid_scale)
         a = (torch.linspace(-self.grid_scale, self.grid_scale, steps=self.grid_size, dtype=torch.float)
              .view(1, self.grid_size)
@@ -43,12 +45,12 @@ class GraphPointCompletionNetwork(nn.Module):
         device = x.device
         feature_global = self.encoder(data.x, data.edge_index, data.batch)                                          # (B, num_coarse)
         # Mapping Network
-        coarse = self.mapping_network(feature_global).view(B, -1, 3)                                                # (B, num_coarse, 3)
+        coarse = self.mapping_network(feature_global).view(-1, self.num_coarse, 3)                                                # (B, num_coarse, 3)
         point_feat = coarse.unsqueeze(2).expand(B,-1, self.grid_size ** 2, 3)                                       # (B, num_coarse, S, 3)
         point_feat = point_feat.reshape(-1, 3, self.num_dense)                                                      # (B, 3, num_dense)
         seed = self.folding_seed.unsqueeze(2).expand(B, -1, self.num_coarse, -1)                                    # (B, 2, num_coarse, S)
         seed = seed.reshape(B, -1, self.num_dense).to(device)                                                       # (B, 2, num_dense)
-        feature_global = feature_global.reshape(-1, self.num_coarse).unsqueeze(2).expand(-1, -1, self.num_dense)    # (B * N, num_coarse)
+        feature_global = feature_global.unsqueeze(2).expand(B, -1, self.num_dense)    # (B * N, num_coarse)
         feat = torch.cat([feature_global, seed, point_feat], dim=1)                                                 # (B, 1024+2+3, num_dense)
         # Decoder
         fine = self.decoder(feat) + point_feat
