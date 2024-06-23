@@ -318,10 +318,6 @@ def main():
         raise ValueError('Dataset configuration not found in config file or empty.')
     train_dataset = GraphShapeNet(**dataset_config.get('train'))
     validation_dataset = GraphShapeNet(**dataset_config.get('validation'))
-    # just for testing
-    # data = Data(x=torch.rand(1024, 3), edge_index=torch.randint(0, 1024, (2, 1024)), y=torch.rand(2048, 3))
-    # train_dataset = [data for _ in range(8)]
-    # validation_dataset = [data for _ in range(8)]
     dataloader_config = config.get('dataloader')
     if not dataloader_config:
         raise ValueError('Dataloader configuration not found in config file or empty.')
@@ -331,10 +327,8 @@ def main():
     }
 
     epochs = config.get('epochs', 100)
-    # epochs = 1
     save_path = config.get('save_path', 'checkpoints')
     save_interval = config.get('save_interval', 100)
-    # save_interval = 1
     telelogger = None
     if params.telelogger:
         with open(params.telelogger, 'r') as file:
